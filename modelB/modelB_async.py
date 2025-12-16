@@ -132,7 +132,7 @@ if __name__ == "__main__":
     
     # 2. 이미지 로드
     print("이미지 파일 로드 중...")
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     images_dir = os.path.join(project_root, "dataset", "training_data", "images")
     all_image_paths = sorted(glob.glob(os.path.join(images_dir, "*.png")) + glob.glob(os.path.join(images_dir, "*.jpg")))
     

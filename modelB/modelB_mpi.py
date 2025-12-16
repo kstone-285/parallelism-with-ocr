@@ -88,7 +88,7 @@ def main():
         return
 
     # 3. 이미지 로드
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     images_dir = os.path.join(project_root, "dataset", "training_data", "images")
     image_paths = sorted(glob.glob(os.path.join(images_dir, "*.png")) + glob.glob(os.path.join(images_dir, "*.jpg")))
 
