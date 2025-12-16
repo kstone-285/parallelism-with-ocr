@@ -32,11 +32,11 @@
 
 1. [Project Overview](#-1-project-overview)
 2. [Theoretical Background](#-2-theoretical-background)
-3. [System Architecture](#-3-system-architecture)
+3. [System Architecture](#%EF%B8%8F-3-system-architecture)
 4. [Performance Benchmark](#-4-performance-benchmark)
 5. [Project Structure](#-5-project-structure)
 6. [How to Run](#-6-how-to-run)
-7. [Members & References](#-7-members--references)
+7. [Members & References](#%E2%80%8D-7-members--references)
 
 ---
 
