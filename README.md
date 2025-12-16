@@ -104,7 +104,7 @@ OCR 추론은 대표적인 **CPU-Bound** 작업이고, 특히 Python은 **GIL**�
 | **Model B** | **Pipeline (Optimized)** | **1 / 9 / 1** | **422.4s** | **7.28x** |
 | **Model B** | Pipeline (Async I/O) | 1 / 9 / 1 | 428.4s | 7.17x |
 
-> **Insight:** 파이프라인 모델(Model B)이 단순 데이터 병렬화(Model A)보다 우수하며, 특히 **1:9:1 비율**에서 유휴 자원이 최소화되어 가장 높은 Throughput을 기록했습니다.
+> **Insight:** 파이프라인 모델(Model B)이 단순 데이터 병렬화(Model A)보다 우수하며, 특히 **1:9:1 비율**에서 유휴 자원이 최소화되어 가장 높은 Throughput을 기록
 
 ---
 
@@ -115,17 +115,21 @@ parallelism-with-ocr/
 │
 ├── dataset/
 │   └── training_data/
-│       └── images/           # CORD-v2 Dataset (Images)
+│       └── images/           # CORD-v2 Dataset
 │
 ├── baseline.py               # [Baseline] Sequential Processing
-├── modelA.py                 # [Model A] Data Parallelism (Pool)
-├── modelA_nopool.py          # [Model A] Manual Process Control
-├── modelA_mpi.py             # [Model A] Distributed Processing with MPI
-├── modelB.py                 # [Model B] Pipeline Parallelism (Sync)
-├── modelB_async.py           # [Model B+] Pipeline with AsyncIO & ThreadPool
-├── modelB_mpi.py             # [Model B] Distributed Pipeline with MPI
 │
-└── requirements.txt          # Dependencies
+├── ModelA/
+│   ├── modelA.py             # [Model A] Data Parallelism (Pool)
+│   ├── modelA_nopool.py      # [Model A] Manual Process Control
+│   ├── modelA_thread.py      # [Model A] Multithreading (GIL Limitation Test)
+│   └── modelA_mpi.py         # [Model A] Distributed Processing with MPI
+│
+└── ModelB/
+    ├── modelB.py             # [Model B] Pipeline Parallelism (Sync)
+    ├── modelB_async.py       # [Model B+] Pipeline with AsyncIO & ThreadPool
+    └── modelB_mpi.py         # [Model B] Distributed Pipeline with MPI
+    └── modelB_thread.py      # [Model B] Multithreading (GIL Limitation Test)
 ```
 
 ---
@@ -134,15 +138,18 @@ parallelism-with-ocr/
 
 Prerequisites
 
-```bash
-# 1. Install Tesseract OCR (System Dependency)
-brew install tesseract  # macOS
-sudo apt install tesseract-ocr  # Linux
+* **Python 3.8+**
 
-# 2. Install Python Packages
-pip install -r requirements.txt
+* **Tesseract OCR** (System Install Required)
+
+* **Python Libraries**: opencv-python, pytesseract, numpy, ipyparallel, mpi4py
+
+```bash
+# Install required libraries manually (No requirements.txt provided)
+pip install opencv-python pytesseract numpy ipyparallel mpi4py
 ```
 Execution
+
 1. Recommended Model (Model B - Optimized Pipeline)
 
 ```bash
@@ -151,13 +158,15 @@ python modelB.py
 # S1 (Preprocess): 1
 # S2 (OCR): 9  (Adjust based on your CPU cores)
 # S3 (Save): 1
-2. AsyncIO Hybrid Model
 ```
+
+2. AsyncIO Hybrid Model
 
 ```bash
 python modelB_async.py
-3. Distributed Simulation (MPI)
 ```
+
+3. Distributed Simulation (MPI)
 
 ```bash
 # Start MPI Cluster (Requires ipyparallel)

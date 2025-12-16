@@ -8,17 +8,9 @@ import cv2
 import pytesseract
 from PIL import Image
 
-# ----------------------------------------------------------------------------
-# STAGE 1: 전처리 (Producer)
-# - 이미지 경로를 받아, 디스크에서 이미지를 읽고 OpenCV로 전처리합니다.
-# - 처리된 NumPy 배열을 'queue_a'에 넣습니다.
-# ----------------------------------------------------------------------------
+# Stage 1: 전처리 (Producer)
 def stage1_preprocess(image_paths, queue_a, worker_id, times_dict):
-    """
-    S1: 이미지를 읽고 전처리하여 queue_a에 넣습니다.
-    (스레드 버전)
-    """
-    # 첫 번째 워커만 전체 스테이지의 시작 시간을 기록합니다.
+    """S1: 이미지 로드 및 전처리"""
     if worker_id == 0:
         times_dict['stage1_start'] = time.time()
         
@@ -30,8 +22,7 @@ def stage1_preprocess(image_paths, queue_a, worker_id, times_dict):
             if not os.path.exists(image_path):
                 print(f" 경고: 파일을 찾을 수 없습니다. {image_path}")
                 continue
-                
-            # II.B의 기준선 코드와 동일한 전처리 로직
+            
             img = cv2.imread(image_path)
             if img is None:
                 print(f" 경고: 이미지를 읽을 수 없습니다. {image_path}")
@@ -43,7 +34,6 @@ def stage1_preprocess(image_paths, queue_a, worker_id, times_dict):
                 cv2.THRESH_BINARY, 11, 2
             )
             
-            # (이미지 ID, 처리된 데이터) 튜플을 큐에 삽입
             queue_a.put((image_path, binary_img))
 
     except Exception as e:
@@ -51,17 +41,9 @@ def stage1_preprocess(image_paths, queue_a, worker_id, times_dict):
     finally:
         print(f" 전처리 스레드 {worker_id} 종료.")
 
-# ----------------------------------------------------------------------------
-# STAGE 2: OCR (Worker Pool)
-# - 'queue_a'에서 전처리된 데이터를 가져옵니다.
-# - Tesseract OCR을 수행합니다.
-# - (이미지 ID, OCR 결과 텍스트)를 'queue_b'에 넣습니다.
-# ----------------------------------------------------------------------------
+# Stage 2: OCR (Worker Pool)
 def stage2_ocr(queue_a, queue_b, times_dict, lock):
-    """
-    S2: queue_a에서 데이터를 받아 Tesseract OCR을 수행하고 queue_b로 보냅니다.
-    'None'을 받으면 루프를 종료하고 'None'을 queue_b로 전파합니다. (스레드 버전)
-    """
+    """S2: OCR 수행"""
     thread_name = threading.current_thread().name
     print(f" OCR 스레드 {thread_name} 시작.")
     
@@ -80,13 +62,11 @@ def stage2_ocr(queue_a, queue_b, times_dict, lock):
             try:
                 pil_img = Image.fromarray(binary_img)
                 
+                # GIL 해제 (pytesseract는 외부 프로세스 호출)
                 ocr_start_time = time.time()
-                # pytesseract 호출은 외부 프로세스를 실행하므로 GIL을 해제합니다.
-                # 따라서 스레딩 환경에서도 병렬성 효과를 볼 수 있습니다.
                 text = pytesseract.image_to_string(pil_img, lang='eng', config=config)
                 ocr_end_time = time.time()
 
-                # Lock을 사용하여 공유된 시간 합계를 안전하게 업데이트합니다.
                 with lock:
                     current_total = times_dict.get('stage2_ocr_total', 0)
                     times_dict['stage2_ocr_total'] = current_total + (ocr_end_time - ocr_start_time)
@@ -102,17 +82,9 @@ def stage2_ocr(queue_a, queue_b, times_dict, lock):
     finally:
         print(f" OCR 스레드 {thread_name} 종료.")
 
-# ----------------------------------------------------------------------------
-# STAGE 3: 결과 취합 (Consumer)
-# - 'queue_b'에서 OCR 결과 튜플을 가져옵니다.
-# - 모든 S2 워커가 'None' 신호를 보낼 때까지 결과를 수집합니다.
-# - 'results_dict'에 최종 결과를 저장합니다.
-# ----------------------------------------------------------------------------
+# Stage 3: 결과 취합 (Consumer)
 def stage3_save(queue_b, t_s2_ocr_count, results_dict, times_dict):
-    """
-    S3: queue_b에서 결과를 받아 results_dict에 저장합니다.
-    S2 스레드 수만큼 'None'을 받으면 종료합니다. (스레드 버전)
-    """
+    """S3: 결과 수집"""
     times_dict['stage3_start'] = time.time()
     thread_name = threading.current_thread().name
     print(f" 결과 취합 스레드 {thread_name} 시작.")
@@ -139,12 +111,10 @@ def stage3_save(queue_b, t_s2_ocr_count, results_dict, times_dict):
         times_dict['stage3_end'] = time.time()
         print(f" 결과 취합 스레드 {thread_name} 종료.")
 
-# ----------------------------------------------------------------------------
-# MAIN: 파이프라인 설정 및 실행
-# ----------------------------------------------------------------------------
+# Main
 if __name__ == "__main__":
     
-    # --- 1. [조정 가능] 스레드 할당 파라미터 ---
+    # 1. 설정
     T_S1_PREPROCESS = 3  # 전처리 스레드 수
     T_S2_OCR = 6         # OCR 워커 스레드 수
     T_S3_SAVE = 1        # 결과 취합 스레드 수
@@ -156,7 +126,7 @@ if __name__ == "__main__":
     
     QUEUE_MAXSIZE = T_S2_OCR * 2
     
-    # --- 2. 이미지 경로 불러오기 ---
+    # 2. 이미지 로드
     print("이미지 파일 로드 중...")
     project_root = os.path.dirname(os.path.abspath(__file__))
     images_dir = os.path.join(project_root, "dataset", "training_data", "images")
@@ -172,27 +142,27 @@ if __name__ == "__main__":
     N_IMAGES = len(image_paths)
     print(f"총 {N_IMAGES}개의 이미지 파일을 찾았습니다.")
 
-    # --- 3. 큐(Queue) 및 공유 데이터 설정 ---
-    results_dict = {}  # 스레드는 메모리를 공유하므로 일반 dict 사용
-    times_dict = {}    # 시간 측정을 위한 공유 딕셔너리
-    lock = threading.Lock() # 공유 데이터(times_dict) 접근 제어를 위한 Lock
+    # 3. 큐 및 공유 데이터
+    results_dict = {}
+    times_dict = {}
+    lock = threading.Lock()
     
     queue_a = queue.Queue(maxsize=QUEUE_MAXSIZE)
     queue_b = queue.Queue(maxsize=QUEUE_MAXSIZE)
     
-    # --- 4. 스레드 생성 및 시작 ---
+    # 4. 스레드 시작
     pipeline_start_time = time.time()
     
     s1_threads, s2_threads, s3_threads = [], [], []
 
-    # 이미지 경로를 S1 워커들에게 분배
+    # S1 이미지 분배
     if T_S1_PREPROCESS > 1:
         chunk_size = (N_IMAGES + T_S1_PREPROCESS - 1) // T_S1_PREPROCESS
         path_chunks = [image_paths[i:i + chunk_size] for i in range(0, len(image_paths), chunk_size)]
     else:
         path_chunks = [image_paths]
 
-    # Stage 1 (전처리) 스레드 생성
+    # S1 (전처리)
     for i in range(T_S1_PREPROCESS):
         worker_paths = path_chunks[i] if i < len(path_chunks) else []
         if not worker_paths: continue
@@ -200,36 +170,31 @@ if __name__ == "__main__":
         s1_threads.append(t1)
         t1.start()
 
-    # Stage 2 (OCR) 워커 풀 생성
+    # S2 (OCR)
     for _ in range(T_S2_OCR):
         t2 = threading.Thread(target=stage2_ocr, args=(queue_a, queue_b, times_dict, lock))
         s2_threads.append(t2)
         t2.start()
 
-    # Stage 3 (결과 취합) 스레드 생성
+    # S3 (결과 취합)
     for _ in range(T_S3_SAVE):
         t3 = threading.Thread(target=stage3_save, args=(queue_b, T_S2_OCR, results_dict, times_dict))
         s3_threads.append(t3)
         t3.start()
 
-    # --- 5. 파이프라인 종료 처리 ---
-    
-    # S1 스레드들이 모든 이미지 처리를 마칠 때까지 기다립니다.
-    # 이 과정에서 S1이 queue_a를 채우고, S2가 queue_a를 비우는 작업이 동시에 일어납니다.
+    # 5. 종료 대기
     for t in s1_threads:
         t.join()
     
-    # S1이 모두 종료되었으므로, S1 종료 시간을 기록합니다.
     if 'stage1_start' in times_dict:
         times_dict['stage1_end'] = time.time()
     print("모든 S1(전처리) 작업 완료.")
 
-    # S1 작업이 모두 끝났으므로, S2 스레드들에게 종료 신호(None)를 보냅니다.
+    # S2 종료 신호 전송
     print(f"S2 스레드들에게 {T_S2_OCR}개의 종료 신호를 전송합니다.")
     for _ in range(T_S2_OCR):
         queue_a.put(None)
 
-    # S2와 S3 스레드들이 모두 종료될 때까지 기다립니다.
     for t in s2_threads + s3_threads:
         t.join()
     print("모든 S2(OCR) 및 S3(결과 취합) 작업 완료.")
@@ -237,7 +202,7 @@ if __name__ == "__main__":
     pipeline_end_time = time.time()
     total_time = pipeline_end_time - pipeline_start_time
     
-    # --- 6. 최종 결과 리포트 ---
+    # 6. 리포트
     stage1_time = times_dict.get('stage1_end', 0) - times_dict.get('stage1_start', 0)
     stage2_ocr_total_time = times_dict.get('stage2_ocr_total', 0)
     stage3_time = times_dict.get('stage3_end', 0) - times_dict.get('stage3_start', 0)
@@ -257,7 +222,7 @@ if __name__ == "__main__":
         print(f"평균 처리량: {N_IMAGES / total_time:.2f} images/sec")
     print("="*50)
 
-    # (선택 사항) 결과 샘플 5개 출력
+    # 샘플 출력
     print("\n--- 결과 샘플 (최대 5개) ---")
     count = 0
     for path, text in results_dict.items():
