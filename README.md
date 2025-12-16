@@ -1,16 +1,30 @@
-# ⚡ High-Performance OCR Pipeline: Optimizing Inference with Parallelism
+<div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)
-![Tesseract](https://img.shields.io/badge/Tesseract-OCR-000000?logo=tesseract&logoColor=white)
-![Multiprocessing](https://img.shields.io/badge/Parallelism-Multiprocessing-orange)
-![AsyncIO](https://img.shields.io/badge/Concurrency-AsyncIO-RED)
-![MPI](https://img.shields.io/badge/Distributed-MPI-purple)
+# ⚡ High-Performance OCR Pipeline
+### Optimizing Inference with Parallelism & Pipelining
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/Tesseract-OCR-000000?logo=tesseract&logoColor=white" alt="Tesseract"/>
+  <img src="https://img.shields.io/badge/Parallelism-Multiprocessing-orange" alt="Multiprocessing"/>
+  <img src="https://img.shields.io/badge/Concurrency-AsyncIO-RED" alt="AsyncIO"/>
+  <img src="https://img.shields.io/badge/Distributed-MPI-purple" alt="MPI"/>
+</p>
+
+<p>
+  <b>대규모 비정형 데이터 처리를 위한 Tesseract OCR 추론 가속화 프로젝트</b><br/>
+  Maximizing Throughput in CPU-Bound OCR Tasks using Asymmetric Pipelining & Hybrid Concurrency
+</p>
+
+<br/>
+
+</div>
 
 > **"Maximizing Throughput in CPU-Bound OCR Tasks using Asymmetric Pipelining & Hybrid Concurrency"**
 
-본 프로젝트는 대규모 비정형 데이터(이미지) 처리에 있어 **Tesseract OCR의 연산 병목(CPU-Bound)**과 **I/O 대기 시간(I/O-Bound)**을 동시에 해결하기 위한 **고성능 분산 처리 아키텍처 연구**입니다.
+본 프로젝트는 대규모 비정형 데이터(이미지) 처리에 있어 **Tesseract OCR의 연산 병목(CPU-Bound)**과 **I/O 대기 시간(I/O-Bound)**을 동시에 해결하기 위한 **고성능 분산 처리 아키텍처 구현 프로젝트**입니다.
 
-단순한 순차 처리 방식을 넘어, **멀티프로세싱 기반의 데이터 병렬화**와 **비대칭 파이프라인(Asymmetric Pipelining) 전략**을 통해 추론 속도를 약 **7.28배** 가속화했습니다.
+단순한 순차 처리 방식을 넘어, **멀티프로세싱 기반의 데이터 병렬화**와 **비대칭 파이프라인(Asymmetric Pipelining) 전략**을 통해 추론 속도를 기존 대비 약 **7.28배** 가속화했습니다.
 
 ---
 
@@ -22,7 +36,7 @@
 4. [Performance Benchmark](#-4-performance-benchmark)
 5. [Project Structure](#-5-project-structure)
 6. [How to Run](#-6-how-to-run)
-7. [Authors & References](#-7-authors--references)
+7. [Members & References](#-7-members--references)
 
 ---
 
@@ -42,14 +56,12 @@
 
 ## 📚 2. Theoretical Background
 
-본 프로젝트의 설계는 다음의 컴퓨터 공학 이론을 기반으로 합니다.
-
 ### 2.1 Why Multiprocessing? (Overcoming GIL)
 OCR 추론은 대표적인 **CPU-Bound** 작업이고, 특히 Python은 **GIL**로 인해 멀티스레딩을 사용하더라도 한 시점에 하나의 스레드만 바이트코드를 실행이 가능
 * **Solution:** 각 워커가 독립된 메모리 공간과 고유한 GIL을 갖는 **Multiprocessing**을 도입하여 물리적 병렬성을 확보
 
 ### 2.2 Why Pipeline? (Resolving Bottleneck)
-파이프라인 시스템의 전체 처리량(Throughput)은 가장 느린 단계(Bottleneck Stage)에 의해 결정 (**Amdahl's Law**)
+파이프라인 시스템의 전체 Throughput은 가장 느린 단계에 의해 결정 (**Amdahl's Law**)
 * **Analysis:** 데이터셋 분석 결과, **추론(Inference) 단계가 전체 실행 시간의 99%**를 차지하는 불균형을 확인
 * **Solution:** 작업을 **[전처리] → [추론] → [후처리]**로 분리하고, 병목 구간인 [추론] 단계에 가용 코어의 80% 이상을 할당하는 **비대칭 자원 할당 전략**을 적용
 
@@ -88,7 +100,7 @@ OCR 추론은 대표적인 **CPU-Bound** 작업이고, 특히 Python은 **GIL**�
 | Model | Architecture | Core Allocation | Time (s) | Speedup |
 | :--- | :--- | :---: | :---: | :---: |
 | **Baseline** | Sequential | 1 Core | 3073.8s | 1.0x |
-| **Model A** | Data Parallelism (Pool) | All Cores | 486.8s | 6.31x |
+| **Model A** | Data Parallelism (Pool) | All(11) Cores | 486.8s | 6.31x |
 | **Model B** | **Pipeline (Optimized)** | **1 / 9 / 1** | **422.4s** | **7.28x** |
 | **Model B** | Pipeline (Async I/O) | 1 / 9 / 1 | 428.4s | 7.17x |
 
@@ -159,10 +171,10 @@ python modelB_mpi.py
 
 ## 👨‍💻 7. Members & References
 
-* Members: Kyoosuk Hwang (21101239), Chandong Hwang (21101240)
+* **Members**: Kyoosuk Hwang (21101239), Chandong Hwang (21101240)
 
-* Institution: Seoul National University of Science and Technology, Dept. of Computer Science
+* **Institution**: Seoul National University of Science and Technology, Dept. of Computer Science
 
-* This project was conducted as part of the Big Data Processing course at Seoul National University of Science and Technology.
+* This project was conducted as part of the **Big Data Processing course** at Seoul National University of Science and Technology.
 
-📘 Note: 본 프로젝트에 대한 더 자세한 이론적 배경, 실험 설계 과정, 그리고 상세한 결과 분석은 리포지토리에 포함된 **[최종 보고서 (PDF/Docx)]**를 참조해주시기 바랍니다.
+📘 Note: 본 프로젝트에 대한 더 자세한 이론적 배경, 실험 설계 과정, 그리고 상세한 결과 분석은 리포지토리에 포함된 **[최종 보고서 (Docx)]**를 참조해주시기 바랍니다.
