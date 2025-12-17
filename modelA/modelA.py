@@ -4,12 +4,13 @@ from PIL import Image
 import time
 import os
 import glob
-import multiprocessing # 1. 멀티프로세싱 모듈 임포트
+import multiprocessing
 
+# Worker: 단일 이미지 통합 처리
 def process_single_image(image_path):
-    """단일 이미지를 읽어 OCR을 수행하는 함수"""
+    """이미지 전처리, OCR, 후처리를 순차 수행"""
     try:
-        # Stage 1: Pre-processing
+        # Stage 1: 전처리
         preprocess_start = time.time()
         
         img = cv2.imread(image_path)
@@ -17,8 +18,6 @@ def process_single_image(image_path):
             return {"text": "", "times": {"preprocess": 0, "ocr": 0, "postprocess": 0}}
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        # 적응형 임계값 처리
         binary_img = cv2.adaptiveThreshold(
             gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY, 11, 2
@@ -32,7 +31,7 @@ def process_single_image(image_path):
         text = pytesseract.image_to_string(pil_img, lang='eng', config=config)
         ocr_time = time.time() - ocr_start
         
-        # Stage 3: Post-processing
+        # Stage 3: 후처리
         postprocess_start = time.time()
         text = text.strip()
         postprocess_time = time.time() - postprocess_start
@@ -47,18 +46,13 @@ def process_single_image(image_path):
         }
         
     except Exception as e:
-        # print(f"Error processing {image_path}: {e}")
         return ""
 
-# --- 병렬 처리(Model A) 메인 루프 ---
-
+# Main: 병렬 처리 설정 및 실행
 if __name__ == "__main__":
-    # 2. __name__ == "__main__": 구문은 
-    #    멀티프로세싱을 사용할 때 반드시 필요합니다.
     
-    # dataset/training_data/images 아래의 모든 PNG 이미지를 사용
-    # (이 부분은 Baseline과 동일)
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    # 1. 이미지 로드
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     images_dir = os.path.join(project_root, "dataset", "training_data", "images")
     image_paths = sorted(glob.glob(os.path.join(images_dir, "*.png")) + glob.glob(os.path.join(images_dir, "*.jpg")))
 
@@ -68,25 +62,25 @@ if __name__ == "__main__":
 
     print(f"총 {len(image_paths)}개의 이미지 처리 시작...")
     
-    # 3. 사용할 CPU 코어 수 확인 (모든 코어 사용)
+    # 2. 프로세스 준비
     cpu_count = multiprocessing.cpu_count()
     print(f"병렬 처리(Model A) 시작... (사용 가능 코어: {cpu_count}개)")
     
     start_time = time.time()
 
-    # 4. Pool을 생성하여 작업을 병렬로 처리
+    # 3. 병렬 처리 실행 (Pool)
     with multiprocessing.Pool() as pool:
-        # 5. pool.map으로 병렬 처리 실행
         results = pool.map(process_single_image, image_paths)
 
     end_time = time.time()
     total_time = end_time - start_time
     
-    # 결과 처리 및 시간 집계
+    # 4. 결과 리포트
     total_times = {"preprocess": 0, "ocr": 0, "postprocess": 0}
     texts = []
     
     for result in results:
+        if not result: continue
         texts.append(result["text"])
         for stage, time_taken in result["times"].items():
             total_times[stage] += time_taken

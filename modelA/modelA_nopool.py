@@ -4,12 +4,13 @@ from PIL import Image
 import time
 import os
 import glob
-import multiprocessing # 1. 멀티프로세싱 모듈 임포트
+import multiprocessing
 
+# Worker: 단일 이미지 통합 처리
 def process_single_image(image_path):
-    """단일 이미지를 읽어 OCR을 수행하는 함수"""
+    """이미지 전처리, OCR, 후처리를 순차 수행"""
     try:
-        # Stage 1: Pre-processing
+        # Stage 1: 전처리
         preprocess_start = time.time()
         
         img = cv2.imread(image_path)
@@ -17,8 +18,6 @@ def process_single_image(image_path):
             return {"text": "", "times": {"preprocess": 0, "ocr": 0, "postprocess": 0}}
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        # 적응형 임계값 처리
         binary_img = cv2.adaptiveThreshold(
             gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY, 11, 2
@@ -32,7 +31,7 @@ def process_single_image(image_path):
         text = pytesseract.image_to_string(pil_img, lang='eng', config=config)
         ocr_time = time.time() - ocr_start
         
-        # Stage 3: Post-processing
+        # Stage 3: 후처리
         postprocess_start = time.time()
         text = text.strip()
         postprocess_time = time.time() - postprocess_start
@@ -47,23 +46,22 @@ def process_single_image(image_path):
         }
         
     except Exception as e:
-        # print(f"Error processing {image_path}: {e}")
         return ""
 
-# --- 워커 프로세스 함수 ---
+# Worker: 프로세스별 작업 루프
 def worker_process(image_paths, result_queue):
-    """워커 프로세스에서 실행될 함수"""
+    """할당된 이미지 청크를 처리하고 결과 큐에 적재"""
     results = []
     for image_path in image_paths:
         result = process_single_image(image_path)
         results.append((image_path, result))
     result_queue.put(results)
 
-# --- 병렬 처리(Model A - No Pool) 메인 루프 ---
-
+# Main: 수동 프로세스 관리 및 실행
 if __name__ == "__main__":
-    # dataset/training_data/images 아래의 모든 PNG 이미지를 사용
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    
+    # 1. 이미지 로드
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     images_dir = os.path.join(project_root, "dataset", "training_data", "images")
     image_paths = sorted(glob.glob(os.path.join(images_dir, "*.png")) + glob.glob(os.path.join(images_dir, "*.jpg")))
 
@@ -71,29 +69,26 @@ if __name__ == "__main__":
         print(f"오류: '{images_dir}'에서 이미지를 찾을 수 없습니다.")
         exit()
 
-    # 사용할 CPU 코어 수 확인
+    # 2. 작업 분할 (Chunking)
     cpu_count = multiprocessing.cpu_count()
     print(f"\n병렬 처리(Model A - No Pool) 시작...")
     print(f"총 {len(image_paths)}개의 이미지, {cpu_count}개의 코어 사용")
     
-    # 작업을 코어 수만큼 분할
     chunk_size = len(image_paths) // cpu_count
     if len(image_paths) % cpu_count:
         chunk_size += 1
     
-    # 프로세스와 큐 준비
+    # 3. 프로세스 생성 및 실행
     processes = []
     result_queue = multiprocessing.Queue()
-    
     start_time = time.time()
     
-    # 각 프로세스에 작업 분배
     for i in range(cpu_count):
         start_idx = i * chunk_size
         end_idx = min(start_idx + chunk_size, len(image_paths))
         chunk = image_paths[start_idx:end_idx]
         
-        if chunk:  # 빈 청크는 건너뛰기
+        if chunk:
             p = multiprocessing.Process(
                 target=worker_process,
                 args=(chunk, result_queue)
@@ -102,20 +97,19 @@ if __name__ == "__main__":
             p.start()
             print(f"워커 {i+1} 시작: {len(chunk)}개 이미지 할당")
 
-    # 모든 프로세스의 결과 수집
+    # 4. 결과 수집 및 종료 대기
     all_results = []
     for _ in range(len(processes)):
         process_results = result_queue.get()
         all_results.extend(process_results)
     
-    # 모든 프로세스 종료 대기
     for p in processes:
         p.join()
         
     end_time = time.time()
     total_time = end_time - start_time
     
-    # 결과 처리 및 시간 집계
+    # 5. 결과 리포트
     total_times = {"preprocess": 0, "ocr": 0, "postprocess": 0}
     texts = []
     

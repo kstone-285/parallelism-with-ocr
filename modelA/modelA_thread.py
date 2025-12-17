@@ -8,18 +8,17 @@ import threading
 import queue 
 import multiprocessing
 
-# --- GIL 시뮬레이션용 락 ---
-# 이 락을 잡은 스레드만 OCR을 돌릴 수 있습니다. (마치 GIL처럼 동작)
-gil_simulation_lock = threading.Lock()
-
-# --- 공유 메모리 ---
+# Global: GIL 시뮬레이션 및 공유 리소스
+gil_simulation_lock = threading.Lock() # OCR 구간 강제 동기화 (GIL 효과)
 shared_results = []
 shared_times = {"preprocess": 0, "ocr": 0, "postprocess": 0}
-result_lock = threading.Lock() 
+result_lock = threading.Lock() # 결과 집계용 Lock
 
+# Worker: 단일 이미지 처리 (GIL 병목 포함)
 def process_single_image(image_path):
+    """이미지 처리 및 GIL 병목 시뮬레이션 수행"""
     try:
-        # Stage 1: Pre-processing (여기는 보통 GIL 영향을 덜 받으므로 놔둡니다)
+        # Stage 1: 전처리
         preprocess_start = time.time()
         img = cv2.imread(image_path)
         if img is None: return None
@@ -31,21 +30,18 @@ def process_single_image(image_path):
         )
         preprocess_time = time.time() - preprocess_start
         
-        # Stage 2: OCR (여기가 핵심!)
+        # Stage 2: OCR (GIL 시뮬레이션)
         ocr_start = time.time()
         pil_img = Image.fromarray(binary_img)
         config = "--psm 6 --oem 1"
         
-        # [핵심 변경] GIL 병목 시뮬레이션
-        # pytesseract가 내부적으로 GIL을 풀어주더라도, 
-        # 우리가 파이썬 레벨에서 Lock을 걸어서 한 번에 한 스레드만 실행하게 만듭니다.
-        # 결과적으로 "병렬 처리"가 아니라 "순차 처리"가 됩니다.
+        # 강제 Lock: 한 번에 한 스레드만 OCR 수행 (순차 처리 유도)
         with gil_simulation_lock:
             text = pytesseract.image_to_string(pil_img, lang='eng', config=config)
             
         ocr_time = time.time() - ocr_start
         
-        # Stage 3: Post-processing
+        # Stage 3: 후처리
         postprocess_start = time.time()
         text = text.strip()
         postprocess_time = time.time() - postprocess_start
@@ -61,9 +57,9 @@ def process_single_image(image_path):
     except Exception:
         return None
 
+# Thread Worker: 큐 소비
 def worker_thread(task_queue, worker_id):
-    """일감을 가져와 처리하는 워커 스레드"""
-    # print(f"스레드-{worker_id} 시작") # 출력 줄임
+    """작업 큐에서 이미지를 가져와 처리"""
     while True:
         try:
             image_path = task_queue.get_nowait()
@@ -80,17 +76,19 @@ def worker_thread(task_queue, worker_id):
         
         task_queue.task_done()
 
+# Main: 스레드 설정 및 실행
 if __name__ == "__main__":
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    
+    # 1. 이미지 로드
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     images_dir = os.path.join(project_root, "dataset", "training_data", "images")
     image_paths = sorted(glob.glob(os.path.join(images_dir, "*.png")) + glob.glob(os.path.join(images_dir, "*.jpg")))
     
-    # image_paths = image_paths * 10 
-
     if not image_paths:
-        print("이미지 없음")
+        print("오류: 이미지를 찾을 수 없습니다.")
         exit()
 
+    # 2. 스레드 및 큐 설정
     thread_count = multiprocessing.cpu_count()
     print(f"멀티스레딩 (GIL 병목 시뮬레이션) 시작... (스레드: {thread_count}개)")
     print("주의: OCR 구간에 강제 Lock을 걸어 성능 저하를 유도합니다.")
@@ -101,6 +99,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
+    # 3. 스레드 시작 및 대기
     threads = []
     for i in range(thread_count):
         t = threading.Thread(target=worker_thread, args=(task_queue, i))
@@ -113,6 +112,7 @@ if __name__ == "__main__":
     end_time = time.time()
     total_time = end_time - start_time
     
+    # 4. 결과 리포트
     print(f"\n[결과] 멀티스레딩(GIL Sim) 완료.")
     print(f"총 소요 시간: {total_time:.2f} 초")
     print(f"-> Baseline과 비슷하거나 더 느려야 정상입니다.")
