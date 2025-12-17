@@ -136,7 +136,7 @@ parallelism-with-ocr/
 
 ## 🏃 6. How to Run
 
-Prerequisites
+#### Prerequisites
 
 * **Python 3.8+**
 
@@ -148,9 +148,9 @@ Prerequisites
 # Install required libraries manually (No requirements.txt provided)
 pip install opencv-python pytesseract numpy ipyparallel mpi4py
 ```
-Execution
+#### Execution
 
-1. Recommended Model (Model B - Optimized Pipeline)
+**1. Recommended Model (Model B - Optimized Pipeline)**
 
 ```bash
 python modelB.py
@@ -160,13 +160,13 @@ python modelB.py
 # S3 (Save): 1
 ```
 
-2. AsyncIO Hybrid Model
+**2. AsyncIO Hybrid Model**
 
 ```bash
 python modelB_async.py
 ```
 
-3. Distributed Simulation (MPI)
+**3. Distributed Simulation (MPI)**
 
 ```bash
 # Start MPI Cluster (Requires ipyparallel)
@@ -186,4 +186,4 @@ python modelB_mpi.py
 
 * This project was conducted as part of the **Big Data Processing course** at Seoul National University of Science and Technology.
 
-📘 Note: 본 프로젝트에 대한 더 자세한 이론적 배경, 실험 설계 과정, 그리고 상세한 결과 분석은 리포지토리에 포함된 **[최종 보고서 (Docx)]**를 참조해주시기 바랍니다.
+📘 Note: 본 프로젝트에 대한 더 자세한 이론적 배경, 실험 설계 과정, 결과 분석은 같이 제출한 **최종 보고서**에 상세히 기술되어 있습니다.
